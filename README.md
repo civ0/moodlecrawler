@@ -8,6 +8,7 @@ PSA: I don't really know Python, I just made it work.
 
 * Python 3
 * BeautifulSoup (bs4)
+* lxml
 
 ## Config
 

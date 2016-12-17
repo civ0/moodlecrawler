@@ -4,30 +4,35 @@ import os.path
 import re
 import requests
 import time
-import urllib3
 import urllib
+import urllib3
 
 from bs4 import BeautifulSoup
+from colorama import Fore, Style
 from zipfile import ZipFile
 
 
 def download_file(session, url, dir):
-    dl_page = session.get(url)
-    dl_page = dl_page.text.split(
-        'class="resourceworkaround">')[1].split('link to view')[0]
-    soup = BeautifulSoup(dl_page, 'lxml')
-    dl_link = soup.find('a').get('href')
-    if 'resource' in dl_link:
-        web_file = session.get(dl_link)
-        filename = dir + urllib.parse.unquote(web_file.url).split('/')[-1]
-        if os.path.isfile(filename):
-            print('\t' + 'File exists: ' + filename)
-        else:
-            print('\t' + 'Saving file: ' + filename)
-            file = open(filename, 'wb')
-            file.write(web_file.content)
-            file.close()
-            web_file.close()
+    try:
+        dl_page = session.get(url)
+        dl_page = dl_page.text.split(
+            'class="resourceworkaround">')[1].split('link to view')[0]
+        soup = BeautifulSoup(dl_page, 'lxml')
+        dl_link = soup.find('a').get('href')
+        if 'resource' in dl_link:
+            web_file = session.get(dl_link)
+            filename = dir + urllib.parse.unquote(web_file.url).split('/')[-1]
+            if os.path.isfile(filename):
+                print('\t' + 'File exists: ' + filename)
+            else:
+                print('\t' + 'Saving file: ' + filename)
+                file = open(filename, 'wb')
+                file.write(web_file.content)
+                file.close()
+                web_file.close()
+    except:
+        print(
+            Fore.RED + '\t' + 'Error downloading file: ' + url + Style.RESET_ALL)
 
 
 def download_folder(session, url, baseurl, output_dir, name):
@@ -75,13 +80,35 @@ def download_course(session, url, baseurl, name, output_dir):
         download_folder(
             session, folder_link, baseurl, folder_path, folder_name)
 
-    course_links = soup.find(class_='course-content').find(class_='weeks')
+    course_links = soup.find(class_='course-content')  # .find(class_='weeks')
     if course_links is not None:
         course_links = course_links.find_all('a')
         for link in course_links:
             link = link.get('href')
-            if 'resource' in link:
+            if link is not None and 'resource' in link:
                 download_file(session, link, path)
+
+
+def download_enrolled(session, baseurl, output_dir):
+    page = session.get(baseurl)
+
+    courses = page.text.split('<div id="frontpage-course-list">')[1].split(
+        '<span class="skip-block-to" id="skipmycourses"></span>')[0]
+
+    regex = re.compile('<span class="coursename">(.*?)</span>')
+    course_list = regex.findall(courses)
+    courses = []
+
+    for course_string in course_list:
+        soup = BeautifulSoup(course_string, 'lxml')
+        a = soup.find('a')
+        course_name = a.text.replace('/', '')
+        course_name = course_name.replace(' ', '_')
+        course_link = a.get('href')
+        courses.append([course_name, course_link])
+
+    for course in courses:
+        download_course(session, course[1], baseurl, course[0], output_dir)
 
 
 dir = os.path.dirname(os.path.abspath(__file__))
@@ -101,7 +128,6 @@ print('Username: ' + username)
 print('Password: hidden\n')
 
 session = requests.Session()
-jar = requests.cookies.RequestsCookieJar()
 payload = {'username': username, 'password': password}
 
 r = session.post(authurl, data=payload)
@@ -111,20 +137,4 @@ if '<div id="frontpage-course-list">' not in content:
     print('Error')
     exit(1)
 
-courses = content.split('<div id="frontpage-course-list">')[1].split(
-    '<span class="skip-block-to" id="skipmycourses"></span>')[0]
-
-regex = re.compile('<span class="coursename">(.*?)</span>')
-course_list = regex.findall(courses)
-courses = []
-
-for course_string in course_list:
-    soup = BeautifulSoup(course_string, 'lxml')
-    a = soup.find('a')
-    course_name = a.text.replace('/', '')
-    course_name = course_name.replace(' ', '_')
-    course_link = a.get('href')
-    courses.append([course_name, course_link])
-
-for course in courses:
-    download_course(session, course[1], baseurl, course[0], output_dir)
+download_enrolled(session, baseurl, output_dir)
