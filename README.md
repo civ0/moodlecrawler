@@ -4,6 +4,11 @@ This tool allows you to bulk download all files from a Moodle2 server.
 
 PSA: I don't really know Python, I just made it work.
 
+## Requirements
+
+* Python 3
+* BeautifulSoup (bs4)
+
 ## Config
 
 > path = 
