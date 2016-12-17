@@ -16,6 +16,7 @@ PSA: I don't really know Python, I just made it work.
 Path to save the files to. Must exist.
 
 > user = 
+> 
 > password = 
 
 The username and password you log in with.
