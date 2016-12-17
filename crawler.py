@@ -8,28 +8,51 @@ import urllib3
 import urllib
 
 from bs4 import BeautifulSoup
+from zipfile import ZipFile
 
 
 def download_file(session, url, dir):
     dl_page = session.get(url)
-    if 'class="resourceworkaround"' not in dl_page:
-        dl_link = dl_page.url
+    dl_page = dl_page.text.split(
+        'class="resourceworkaround">')[1].split('link to view')[0]
+    soup = BeautifulSoup(dl_page, 'lxml')
+    dl_link = soup.find('a').get('href')
+    if 'resource' in dl_link:
+        web_file = session.get(dl_link)
+        filename = dir + urllib.parse.unquote(web_file.url).split('/')[-1]
+        if os.path.isfile(filename):
+            print('\t' + 'File exists: ' + filename)
+        else:
+            print('\t' + 'Saving file: ' + filename)
+            file = open(filename, 'wb')
+            file.write(web_file.content)
+            file.close()
+            web_file.close()
+
+
+def download_folder(session, url, baseurl, output_dir, name):
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+        print('\t' + 'Created folder: ' + output_dir)
     else:
-        dl_page = dl_page.text.split(
-            'class="resourceworkaround">')[1].split('link to view')[0]
-        soup = BeautifulSoup(dl_page, 'lxml')
-        dl_link = soup.find('a').get('href')
-    if 'resource' not in dl_link:
-        return None
-    web_file = session.get(dl_link)
-    print(web_file.url)
+        print('\t' + 'Folder exists: ' + output_dir)
+    payload = {'id': url.split('id=')[1]}
+    folder_dl_url = baseurl + '/mod/folder/download_folder.php'
+    print('\t' + 'Downloading folder: ' + name)
+    zip_folder = session.post(folder_dl_url, payload)
+    zipfile_name = output_dir + '/' + 'folder.zip'
+    file = open(zipfile_name, 'wb')
+    file.write(zip_folder.content)
+    file.close()
+    zip_folder.close()
+    zipfile = ZipFile(zipfile_name)
+    print('\t' + 'Extracting...')
+    zipfile.extractall(path=output_dir)
+    zipfile.close()
+    os.remove(zipfile_name)
 
 
-def download_folder(session, url, output_dir):
-    pass
-
-
-def download_course(session, url, name, output_dir):
+def download_course(session, url, baseurl, name, output_dir):
     path = output_dir + name + '/'
     if not os.path.isdir(path):
         os.mkdir(path)
@@ -38,19 +61,27 @@ def download_course(session, url, name, output_dir):
         print('Course ' + name + ' exists')
     course_page = session.get(url)
     soup = BeautifulSoup(course_page.text, 'lxml')
-    # course_folders = soup.find_all(class_='activity folder modtype_folder')
     course_folders = soup.find_all('li')
     course_folders = soup.find_all(class_='modtype_folder')
 
     for folder in course_folders:
         folder_name = folder.text
+        folder_name = folder_name.replace(
+            folder.find(class_='accesshide').text, '')
+        folder_name = folder_name.replace('/', '')
+        folder_name = folder_name.replace(' ', '_')
         folder_link = folder.find('a').get('href')
+        folder_path = path + folder_name
+        download_folder(
+            session, folder_link, baseurl, folder_path, folder_name)
 
     course_links = soup.find(class_='course-content').find(class_='weeks')
     if course_links is not None:
         course_links = course_links.find_all('a')
         for link in course_links:
-            download_file(session, link.get('href'), path)
+            link = link.get('href')
+            if 'resource' in link:
+                download_file(session, link, path)
 
 
 dir = os.path.dirname(os.path.abspath(__file__))
@@ -63,10 +94,11 @@ username = config.get('DEFAULT', 'user')
 password = config.get('DEFAULT', 'password')
 output_dir = config.get('DEFAULT', 'path')
 
-# print('URL: ' + url)
-# print('Download directory: ' + output_dir)
-# print('Username: ' + username)
-# print('Password: hidden')
+print('Base-URL: ' + baseurl)
+print('Auth-URL: ' + authurl)
+print('Download directory: ' + output_dir)
+print('Username: ' + username)
+print('Password: hidden\n')
 
 session = requests.Session()
 jar = requests.cookies.RequestsCookieJar()
@@ -95,35 +127,4 @@ for course_string in course_list:
     courses.append([course_name, course_link])
 
 for course in courses:
-    download_course(session, course[1], course[0], output_dir)
-    # if not os.path.isdir(output_dir + course[0] + '/'):
-    #     os.mkdir(output_dir + course[0])
-    # r = session.get(course[1])
-    # soup = BeautifulSoup(r.text, 'lxml')
-    # course_links = soup.find(class_='course-content').find(class_='weeks')
-
-    # if course_links is not None:
-    #     course_links = course_links.find_all('a')
-    # else:
-    #     continue
-    # for link in course_links:
-    # current_dir = output_dir + course[0] + '/'
-    # href = link.get('href')
-    # if 'resource' in href:
-    #     time.sleep(1)
-    #     dl_page = session.get(href)
-    #     dl_page = dl_page.text.split(
-    #         'class="resourceworkaround">')[1].split('link to view')[0]
-    #     dl_soup = BeautifulSoup(dl_page, 'lxml')
-    #     dl_link = dl_soup.find('a').get('href')
-    #     web_file = session.get(dl_link)
-    #     filename = current_dir + \
-    #         urllib.parse.unquote(web_file.url).split('/')[-1]
-    #     if os.path.isfile(filename):
-    #         print('File exists: ' + filename)
-    #     else:
-    #         print('Saving: ' + filename)
-    #         file = open(filename, 'wb')
-    #         file.write(web_file.content)
-    #         file.close()
-    #         web_file.close()
+    download_course(session, course[1], baseurl, course[0], output_dir)
