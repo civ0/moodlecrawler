@@ -124,7 +124,7 @@ class Crawler:
             folder_name = folder_name.replace(
                 folder.find(class_='accesshide').text, '')
             folder_name = folder_name.replace('/', '')
-            folder_name = folder_name.replace(' ', '')
+            folder_name = folder_name.replace(' ', '_')
             folder_path = os.path.join(path, folder_name)
             folder_link = folder.find('a').get('href')
             self.download_folder(folder_name, folder_path, folder_link)
