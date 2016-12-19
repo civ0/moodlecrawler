@@ -2,14 +2,13 @@
 
 This tool allows you to bulk download all files from a Moodle2 server.
 
-PSA: I don't really know Python, I just made it work.
-
 The code ist based on this Moodle downloader: https://github.com/vinaychandra/Moodle-Downloader
 
 ## Requirements
 
 * Python 3
 * BeautifulSoup (bs4)
+* colorama
 * lxml
 
 ## Config
@@ -22,7 +21,8 @@ Path to save the files to. Must exist.
 > 
 > password = 
 
-The username and password you log in with.
+The username and password you log in with. When you leave the password empty, you will be prompted
+for it.
 
 > baseurl =
 
